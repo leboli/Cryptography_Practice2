@@ -1,6 +1,6 @@
 from collections import Counter
 
-from breakers.break_caesar import frequency_table
+from substitution.breakers.break_caesar import frequency_table
 from utils.basics import normalise
 from utils.constants import (
     ENGLISH_BIGRAM_FREQUENCY_TABLE,

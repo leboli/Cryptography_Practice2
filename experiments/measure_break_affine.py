@@ -1,12 +1,12 @@
 # C2 - measurement for the Affine breaker.
 # Same idea as the Caesar one: 200 random fragments per length, random (a, b)
 # key, and we count how often break_affine gets the key back.
-# Run with: py -m breakers.measure_break_affine
+# Run with: py -m experiments.measure_break_affine
 import random
 
-from cyphers.affine import encrypt as affine_encrypt, valid_keys
-from breakers.break_affine import break_affine
-from breakers.measure_break_caesar import random_fragment
+from substitution.cyphers.affine import encrypt as affine_encrypt, valid_keys
+from substitution.breakers.break_affine import break_affine
+from experiments.measure_break_caesar import random_fragment
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT
 
 LENGTHS = [20, 30, 40, 60, 100]

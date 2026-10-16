@@ -2,8 +2,8 @@
 # Runs the assistant on the given cryptogram and checks how many letters of the
 # suggested mapping are right. The real key below was worked out by hand
 # (starting from the report's trigram/bigram hints), assist.py never uses it.
-# Run with: py -m breakers.measure_assist
-from breakers.assist import suggested_mapping, report
+# Run with: py -m experiments.measure_assist
+from substitution.breakers.assist import suggested_mapping, report
 from utils.basics import normalise
 from utils.constants import ENGLISH_FREQUENCY_TABLE
 

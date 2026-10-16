@@ -1,6 +1,6 @@
 import pytest
 
-from cyphers.monoalpha import encrypt, decrypt, key_from_keyword
+from substitution.cyphers.monoalpha import encrypt, decrypt, key_from_keyword
 from utils.basics import normalise
 
 KEY = "MNBVCXZASDFGHJKLPOIUYTREWQ"

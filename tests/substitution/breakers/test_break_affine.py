@@ -1,7 +1,7 @@
 import pytest
 
-from cyphers.affine import encrypt, valid_keys
-from breakers.break_affine import break_affine
+from substitution.cyphers.affine import encrypt, valid_keys
+from substitution.breakers.break_affine import break_affine
 from utils.basics import normalise
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT
 from tests.helpers import random_fragments

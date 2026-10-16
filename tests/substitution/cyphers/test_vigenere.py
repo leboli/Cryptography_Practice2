@@ -1,6 +1,6 @@
 import pytest
 
-from cyphers.vigenere import encrypt, decrypt, cosets
+from substitution.cyphers.vigenere import encrypt, decrypt, cosets
 from utils.basics import normalise
 
 TEXT = "Cryptography is the only branch of computing designed against an intelligent opponent!"

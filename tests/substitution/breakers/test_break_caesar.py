@@ -1,7 +1,7 @@
 import pytest
 
-from cyphers.caesar import encrypt
-from breakers.break_caesar import break_caesar, chi_squared, frequency_table
+from substitution.cyphers.caesar import encrypt
+from substitution.breakers.break_caesar import break_caesar, chi_squared, frequency_table
 from utils.basics import normalise
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT, ENGLISH_FREQUENCY_TABLE, SPANISH_FREQUENCY_TABLE
 from tests.helpers import random_fragments

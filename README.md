@@ -63,10 +63,10 @@ On invalid input (a non-invertible `a`, a key that is not a permutation, a Vigen
 ## Measurements and tests
 
 ```
-py -m breakers.measure_break_caesar     # C1 table
-py -m breakers.measure_break_affine     # C2 table
-py -m breakers.measure_break_vigenere   # C3 tables
-py -m breakers.measure_assist           # C4 report on the given cryptogram
+py -m experiments.measure_break_caesar     # C1 table
+py -m experiments.measure_break_affine     # C2 table
+py -m experiments.measure_break_vigenere   # C3 tables
+py -m experiments.measure_assist           # C4 report on the given cryptogram
 py -m pytest -v                         # all the tests
 ```
 
@@ -85,7 +85,7 @@ Every cipher test file follows the same structure: the check values published in
 
 # Deviations from the handout
 
-- **Folder layout.** The modules are grouped in folders instead of sitting at the root (only `crypto.py` is at the root): `utils/basics.py`, `cyphers/{caesar,affine,monoalpha,vigenere}.py`, `breakers/{break_caesar,break_affine,break_vigenere,assist}.py`. Function names and signatures are exactly the ones in the handout.
+- **Folder layout.** The modules are grouped in folders instead of sitting at the root (only `crypto.py` is at the root): `utils/basics.py`, `substitution/cyphers/{caesar,affine,monoalpha,vigenere}.py`, `substitution/breakers/{break_caesar,break_affine,break_vigenere,assist}.py`, `experiments/measure_*.py`. Function names and signatures are exactly the ones in the handout.
 - **Accents are folded, not dropped.** Input is normalised to uppercase A-Z as required, but accented letters are first reduced to their base letter (`É -> E`, `Ñ -> N`) instead of being removed, so Spanish text keeps all its letters. Because of this, the frequency of Ñ is added to N in the Spanish table.
 - **Unknown languages are rejected.** Any `language` other than `"en"` or `"es"` raises `ValueError`.
 
@@ -110,7 +110,7 @@ Every cipher test file follows the same structure: the check values published in
 Run the measurements:
 
 ```
-py -m breakers.measure_break_caesar
+py -m experiments.measure_break_caesar
 ```
 
 Recovery rate (200 fragments per length, fixed seed):
@@ -149,7 +149,7 @@ The measurement fragments are taken from public-domain texts: the start of *Prid
 Run the measurements:
 
 ```
-py -m breakers.measure_break_affine
+py -m experiments.measure_break_affine
 ```
 
 Recovery rate (200 fragments per length, fixed seed):
@@ -179,7 +179,7 @@ Recovery rate (200 fragments per length, fixed seed):
 Run the measurements:
 
 ```
-py -m breakers.measure_break_vigenere
+py -m experiments.measure_break_vigenere
 ```
 
 Recovery rate (100 fragments per combination, fixed seed), each own-language text with its own table:
@@ -226,7 +226,7 @@ Recovery rate (100 fragments per combination, fixed seed), each own-language tex
 Run it on the given cryptogram (and check the mapping against the real key):
 
 ```
-py -m breakers.measure_assist
+py -m experiments.measure_assist
 ```
 
 The cryptogram (110 letters, 22 distinct):
@@ -287,4 +287,4 @@ For this project I used Claude Code for the following:
 - Recovering the real key for the C4 cryptogram (used only in `measure_assist.py`, to grade the suggested mapping) with a quadgram-based hill-climbing/simulated-annealing search against public-domain English text, to know the ground truth for the report-task questions.
 - Redacting answers and this file.
 - Writing the Part D tests (`tests/test_crypto.py`) and the "How to run it" section of this file.
-- Reviewing the whole project against the handout: renaming functions to the handout names, stricter key validation (non A-Z letters in keys, empty XOR key, unknown language), and rewriting the tests so every part has check values, round-trips, invalid keys, edge cases and 20 generated ciphertexts per breaker. Measurements were re-run afterwards. 
+- Reviewing the whole project against the handout: renaming functions to the handout names, stricter key validation (non A-Z letters in keys, empty XOR key, unknown language), and rewriting the tests so every part has check values, round-trips, invalid keys, edge cases and 20 generated ciphertexts per breaker. Measurements were re-run afterwards. 

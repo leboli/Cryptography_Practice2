@@ -1,5 +1,5 @@
-from cyphers.vigenere import cosets, decrypt as vigenere_decrypt
-from breakers.break_caesar import break_caesar
+from substitution.cyphers.vigenere import cosets, decrypt as vigenere_decrypt
+from substitution.breakers.break_caesar import break_caesar
 from utils.basics import to_letters
 
 

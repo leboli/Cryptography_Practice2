@@ -1,6 +1,6 @@
 import pytest
 
-from cyphers.caesar import encrypt, decrypt
+from substitution.cyphers.caesar import encrypt, decrypt
 from utils.basics import normalise
 
 TEXT = "Cryptography is the only branch of computing designed against an intelligent opponent!"

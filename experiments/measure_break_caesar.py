@@ -1,11 +1,11 @@
 # C1 - measurement for the Caesar breaker.
 # For each length: 200 random fragments of a reference text, encrypted with a
 # random key, and we count how often break_caesar gets the key back.
-# Run with: py -m breakers.measure_break_caesar
+# Run with: py -m experiments.measure_break_caesar
 import random
 
-from cyphers.caesar import encrypt as caesar_encrypt
-from breakers.break_caesar import break_caesar
+from substitution.cyphers.caesar import encrypt as caesar_encrypt
+from substitution.breakers.break_caesar import break_caesar
 from utils.basics import normalise
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT
 

@@ -1,6 +1,6 @@
 import pytest
 
-from cyphers.affine import encrypt, decrypt, valid_keys
+from substitution.cyphers.affine import encrypt, decrypt, valid_keys
 from utils.basics import normalise
 
 TEXT = "Cryptography is the only branch of computing designed against an intelligent opponent!"

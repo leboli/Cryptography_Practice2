@@ -1,6 +1,6 @@
 import pytest
 
-from breakers.assist import (
+from substitution.breakers.assist import (
     ngrams,
     letter_frequencies,
     repeated_ngrams,
@@ -9,7 +9,7 @@ from breakers.assist import (
     suggested_mapping,
     report,
 )
-from breakers.measure_assist import TRUE_KEY
+from experiments.measure_assist import TRUE_KEY
 from utils.basics import normalise
 from utils.constants import ENGLISH_FREQUENCY_TABLE
 

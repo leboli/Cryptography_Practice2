@@ -2,8 +2,8 @@ import random
 
 import pytest
 
-from cyphers.vigenere import encrypt
-from breakers.break_vigenere import break_vigenere
+from substitution.cyphers.vigenere import encrypt
+from substitution.breakers.break_vigenere import break_vigenere
 from utils.basics import ALPHABET, normalise
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT
 from tests.helpers import random_fragments

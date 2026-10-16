@@ -1,11 +1,11 @@
 import argparse
 import sys
 
-from cyphers import caesar, affine, monoalpha, vigenere
-from breakers.break_caesar import break_caesar
-from breakers.break_affine import break_affine
-from breakers.break_vigenere import break_vigenere
-from breakers.assist import report
+from substitution.cyphers import caesar, affine, monoalpha, vigenere
+from substitution.breakers.break_caesar import break_caesar
+from substitution.breakers.break_affine import break_affine
+from substitution.breakers.break_vigenere import break_vigenere
+from substitution.breakers.assist import report
 from utils.basics import normalise
 
 

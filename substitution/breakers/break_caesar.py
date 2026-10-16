@@ -1,6 +1,6 @@
 from collections import Counter
 
-from cyphers.caesar import decrypt as caesar_decrypt
+from substitution.cyphers.caesar import decrypt as caesar_decrypt
 from utils.basics import normalise
 from utils.constants import ENGLISH_FREQUENCY_TABLE, SPANISH_FREQUENCY_TABLE
 

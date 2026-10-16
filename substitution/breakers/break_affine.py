@@ -1,5 +1,5 @@
-from breakers.break_caesar import chi_squared, frequency_table
-from cyphers.affine import decrypt as affine_decrypt, valid_keys
+from substitution.breakers.break_caesar import chi_squared, frequency_table
+from substitution.cyphers.affine import decrypt as affine_decrypt, valid_keys
 
 
 def break_affine(ciphertext: str, language: str = "en") -> tuple[tuple[int, int], str]:

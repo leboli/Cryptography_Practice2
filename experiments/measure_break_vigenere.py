@@ -1,12 +1,12 @@
 # C3 - measurement for the Vigenere breaker.
 # For each key length m and text length: 100 random fragments encrypted with a
 # random key of length m, and we count how often break_vigenere gets it back.
-# Run with: py -m breakers.measure_break_vigenere
+# Run with: py -m experiments.measure_break_vigenere
 import random
 
-from cyphers.vigenere import encrypt as vigenere_encrypt
-from breakers.break_vigenere import break_vigenere
-from breakers.measure_break_caesar import random_fragment
+from substitution.cyphers.vigenere import encrypt as vigenere_encrypt
+from substitution.breakers.break_vigenere import break_vigenere
+from experiments.measure_break_caesar import random_fragment
 from utils.basics import ALPHABET
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT
 
