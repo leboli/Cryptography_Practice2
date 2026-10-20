@@ -1,10 +1,10 @@
-# Practice 1 - Substitution Ciphers and Their Cryptanalysis
+# Practice 2 
 
 20357 Cryptography - Bachelor in Data Science and Engineering - Universidad CEU San Pablo, 2026/27
 
 **Author:** Lucia Eboli Courreges
 
-**Repository:** https://github.com/leboli/Cryptography_Practice1.git
+**Repository:** https://github.com/leboli/Cryptography_Practice2.git
 
 # How to run it
 
@@ -287,4 +287,4 @@ For this project I used Claude Code for the following:
 - Recovering the real key for the C4 cryptogram (used only in `measure_assist.py`, to grade the suggested mapping) with a quadgram-based hill-climbing/simulated-annealing search against public-domain English text, to know the ground truth for the report-task questions.
 - Redacting answers and this file.
 - Writing the Part D tests (`tests/test_crypto.py`) and the "How to run it" section of this file.
-- Reviewing the whole project against the handout: renaming functions to the handout names, stricter key validation (non A-Z letters in keys, empty XOR key, unknown language), and rewriting the tests so every part has check values, round-trips, invalid keys, edge cases and 20 generated ciphertexts per breaker. Measurements were re-run afterwards. 
+- Reviewing the whole project against the handout: renaming functions to the handout names, stricter key validation (non A-Z letters in keys, empty XOR key, unknown language), and rewriting the tests so every part has check values, round-trips, invalid keys, edge cases and 20 generated ciphertexts per breaker. Measurements were re-run afterwards. 
