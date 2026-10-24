@@ -47,9 +47,10 @@ def decrypt(ciphertext: str, keyword: str) -> str:
 
     return plaintext.rstrip("X")
 
-if __name__ == "__main__":
-    # Example usage
-    plaintext = "MYSECRETMESSAGE"
-    keyword = "CIPHER"
-    ciphertext = encrypt(plaintext, keyword)
-    print(f"Ciphertext: {ciphertext}")
+def encrypt_double(plaintext: str, kw1: str, kw2: str, pad: str = "X") -> str:
+    intermediate = encrypt(plaintext, kw1, pad)
+    return encrypt(intermediate, kw2, pad)
+
+def decrypt_double(ciphertext: str, kw1: str, kw2: str) -> str:
+    intermediate = decrypt(ciphertext, kw2)
+    return decrypt(intermediate, kw1)

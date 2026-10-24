@@ -1,5 +1,5 @@
 import pytest
-from transposition.cyphers.columnar import encrypt, decrypt, key_order
+from transposition.cyphers.columnar import encrypt, decrypt, key_order, encrypt_double, decrypt_double
 
 class TestColumnar:
 
@@ -25,3 +25,10 @@ class TestColumnar:
         ciphertext = encrypt(plaintext, keyword)
         decrypted_text = decrypt(ciphertext, keyword)
         assert decrypted_text == plaintext.replace(" ", "").upper()
+
+    def test_double_encryption(self):
+        assert encrypt_double("THESAMEKEYMUSTNEVERBEUSEDTWICE", "ROTOR", "ENIGMA") == "WCTEIHSTAEVREBEUTMNSUEEDSEEMYK"
+
+
+    def test_double_decryption(self):
+        assert decrypt_double("WCTEIHSTAEVREBEUTMNSUEEDSEEMYK", "ROTOR", "ENIGMA") == "THESAMEKEYMUSTNEVERBEUSEDTWICE"
