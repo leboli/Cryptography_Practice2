@@ -69,6 +69,7 @@ py -m experiments.measure_break_vigenere   # C3 tables
 py -m experiments.measure_assist           # C4 report on the given cryptogram
 py -m experiments.measure_index            # B1 index of coincidence vs length
 py -m experiments.measure_classify         # B2 cipher family classifier, X pad vs random pad
+py -m experiments.measure_attack_vigenere  # C2 automatic Vigenere attack, key and key length
 py -m pytest -v                         # all the tests
 ```
 
@@ -221,6 +222,87 @@ The gcd needs every distance to be a multiple of the key length. One accidental 
 This happens with real text. Encrypting the English reference text with `LEMON` gives 98 distinct distances. 70 of them are multiples of 5, and the gcd of all 98 is **1**. The tally still points at 5 (70 distances), well ahead of 10 (36) and 15 (22). The same happens with `CIPHER` (6) and `SECRETS` (7) in the tests.
 
 **Condition under which the gcd silently fails:** whenever at least one distance is not a multiple of the key length, that is, whenever there is a single accidental repeat. The longer the ciphertext, the more accidental repeats there are, so the gcd gets worse with more data, the opposite of what you'd expect from a statistical test. It also fails the other way when all the distances happen to share an extra factor (for example they are all multiples of 10 when the key length is 5): then it returns a multiple of the key length. That one is less of a problem, since with more repeats the extra factor usually disappears.
+
+## C: Breaking
+
+### C1: Key length
+
+`coset_ic` splits the ciphertext into `m` cosets (letters `i, i+m, i+2m, ...`) and returns the average of their indices of coincidence. If `m` is the key length (or a multiple of it), every coset was shifted by a single letter of the key, so it keeps the index of the language. Otherwise each coset mixes several shifts and its index drops towards random.
+
+**What "clearly above the baseline" means:** The baseline is random text, 1/26 ≈ 0.0385. The target is the index of the language, Σp² over the frequency table: 0.0655 for English, 0.0743 for Spanish. An average counts as clearly above the baseline when it gets at least **3/4 of the way** from random to the language:
+
+| language | random | language IC | threshold |
+|----------|--------|-------------|-----------|
+| en       | 0.0385 | 0.0655      | **0.0588** |
+| es       | 0.0385 | 0.0743      | **0.0653** |
+
+`find_key_length` returns the smallest `m` from 1 to `max_m` whose average reaches the threshold. Taking the largest average would be wrong, because multiples of the key length are just as high (sometimes a bit higher by chance). If no `m` reaches it, which happens with very short texts, it returns the `m` with the highest average as a best guess.
+
+Why 3/4 and not halfway: divisors of the key length also rise above random. With a key of length 6, `m = 3` puts two key letters in each coset, which is already noticeably less flat than random. Halfway (0.052 in English) is low enough for those divisor bumps to get past it on short texts.
+
+Table for the English reference text (1033 letters) encrypted with `CIPHER`, true key length 6:
+
+| m  | coset_ic | | m  | coset_ic | |
+|----|----------|-|----|----------|-|
+| 1  | 0.0448 | divisor | 9  | 0.0545 | |
+| 2  | 0.0487 | divisor | 10 | 0.0474 | |
+| 3  | 0.0547 | divisor | 11 | 0.0450 | |
+| 4  | 0.0491 | | 12 | **0.0694** | multiple ✓ |
+| 5  | 0.0438 | | 13 | 0.0448 | |
+| 6  | **0.0691** | **true length** ✓ | 14 | 0.0487 | |
+| 7  | 0.0446 | | 15 | 0.0531 | |
+| 8  | 0.0493 | | 16 | 0.0498 | |
+
+✓ = reaches the threshold 0.0588. Only 6 and its multiple 12 pass, and 12 (0.0694) is slightly higher than 6 (0.0691), so "take the maximum" would have returned 12. The smallest-passing rule returns 6.
+
+The divisors 2 and 3 stand above the floor of about 0.044, and 3 is higher than 2, since each of its cosets mixes only two shifts. The same effect explains 8, 9, 15, 16 and others: they share a factor with 6 (2 or 3), so their cosets also mix fewer shifts than a completely unrelated `m` like 5, 7, 11 or 13. All of them stay below the threshold.
+
+### C2: Automatic Vigenère attack
+
+`attack` chains what was already there: `find_key_length` (C1) gives `m`, and `break_vigenere` from Practice 1 splits the text into `m` cosets, breaks each one with the Caesar breaker and puts the shifts together as the key.
+
+**Measurement** (`experiments/measure_attack_vigenere.py`, seed 42). For each cell, 100 trials: a random fragment of the reference text, encrypted with a random key of length `m` (letters drawn independently, so repeats are allowed).
+
+Complete key recovered:
+
+| length | m=3 | m=5 | m=7 | m=9 | | m=3 | m=5 | m=7 | m=9 |
+|--------|-----|-----|-----|-----|-|-----|-----|-----|-----|
+|        | **en** | | | | | **es** | | | |
+| 100    | 74% | 70% | 32% | 7%  | | 96% | 86% | 47% | 18% |
+| 150    | 94% | 95% | 84% | 38% | | 99% | 95% | 96% | 85% |
+| 200    | 94% | 100% | 97% | 78% | | 99% | 100% | 100% | 99% |
+| 300    | 96% | 100% | 100% | 97% | | 99% | 100% | 100% | 100% |
+| 400    | 97% | 100% | 100% | 100% | | 100% | 100% | 100% | 100% |
+
+Key length correct:
+
+| length | m=3 | m=5 | m=7 | m=9 | | m=3 | m=5 | m=7 | m=9 |
+|--------|-----|-----|-----|-----|-|-----|-----|-----|-----|
+|        | **en** | | | | | **es** | | | |
+| 100    | 74% | 88% | 76% | 84% | | 96% | 92% | 85% | 87% |
+| 150    | 94% | 95% | 98% | 90% | | 99% | 95% | 100% | 98% |
+| 200    | 94% | 100% | 100% | 98% | | 99% | 100% | 100% | 99% |
+| 300    | 96% | 100% | 100% | 98% | | 99% | 100% | 100% | 100% |
+| 400    | 97% | 100% | 100% | 100% | | 100% | 100% | 100% | 100% |
+
+Spanish does better everywhere, because its index (0.0743) is further from random than English (0.0655), so both the key length and each Caesar shift stand out more.
+
+**Why m=3 doesn't reach 100%.** In every m=3 cell, the failures of the two tables are the same: when the key length is right, the key is right too. The failures come from `find_key_length` returning 1. With only three shifts mixed, the whole text is less flat than with seven or nine (about 0.05 instead of 0.044 in English), so it sits close to the threshold 0.0588 and noise can push it over. It is worst when two key letters are equal (`HUU`, `XKX`): then two thirds of the text has the same shift and m=1 passes even on 400 letters. About 11% of random 3-letter keys have a repeated letter, while for longer keys a repeat matters much less. With distinct letters only, m=3 in English gets the length right 97% of the time at 200 letters and 99.4% at 300. This is the price of the "smallest m that passes" rule: it never confuses multiples, but a key with few, similar shifts can look like m=1.
+
+**The two tables degrade at very different rates. Which quantity governs each?**
+
+- **Complete key: the letters per coset, n/m.** Each shift is found by a Caesar break on a coset of only n/m letters, and the key is only right if all m of them are right. The cells line up by n/m and not by n: around 40 letters per coset (200/5, 300/7, 400/9) is 97–100%, around 22 (200/9, 150/7) is 78–84%, around 14 (100/7) is 32% and 11 (100/9) is 7%. The Caesar breaker on its own needs about 25–30 letters (measured on 2000 English fragments: 97% at 20–22 letters, 99% at 25, 100% at 30), and with m of them in a row the small per-coset error multiplies.
+- **Key length: the total length n.** `coset_ic` averages over all m cosets, so it always uses every letter of the text, and the average is much less noisy than any single coset. At n=100 the column barely changes with m (88%, 76%, 84% for m=5, 7, 9), while the key table falls from 70% to 7% on the same ciphertexts. The only clear exception is m=3 (see above).
+
+**Your attack succeeds on 200 letters with a 5-letter key and fails with a 9-letter key. Why?**
+
+The key length is found in both cases (100% and 98%), so the difference is in the Caesar step. With m=5 each coset has 200/5 = 40 letters, well above what the Caesar breaker needs, so all five shifts are right. With m=9 each coset has only 200/9 ≈ 22 letters. At that length a single Caesar break is right about 97% of the time, and all nine must be right: 0.97⁹ ≈ 0.76, close to the 78% measured. The text is the same length, but each Caesar break sees about half as many letters, and there are almost twice as many breaks that all have to succeed.
+
+**Rule of thumb: how much ciphertext is needed?**
+
+  **n ≥ 40 · m** letters for English (**n ≥ 25 · m** for Spanish), where m is the longest key length you want to cover.
+
+That gives each coset the ~30–40 letters the Caesar breaker needs, with a margin for having m of them in a row. For short keys, also keep n ≥ ~200 (300 for m=3 in English), since then the key-length step, not the Caesar step, is the limit.
 
 
 
