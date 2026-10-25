@@ -70,6 +70,7 @@ py -m experiments.measure_assist           # C4 report on the given cryptogram
 py -m experiments.measure_index            # B1 index of coincidence vs length
 py -m experiments.measure_classify         # B2 cipher family classifier, X pad vs random pad
 py -m experiments.measure_attack_vigenere  # C2 automatic Vigenere attack, key and key length
+py -m experiments.measure_break_columnar   # C3 columnar breaker table and search time (~3 min)
 py -m pytest -v                         # all the tests
 ```
 
@@ -303,6 +304,43 @@ The key length is found in both cases (100% and 98%), so the difference is in th
   **n ≥ 40 · m** letters for English (**n ≥ 25 · m** for Spanish), where m is the longest key length you want to cover.
 
 That gives each coset the ~30–40 letters the Caesar breaker needs, with a margin for having m of them in a row. For short keys, also keep n ≥ ~200 (300 for m=3 in English), since then the key-length step, not the Caesar step, is the limit.
+
+### C3: Columnar transposition breaker
+
+`attack` tries all n! column orders. For each one it decrypts with the existing columnar `decrypt` (the order is turned into a keyword with the same `key_order`, e.g. `(2, 1, 3)` → `"BAC"`), scores the result and keeps the best. The order it returns is in the same format as `key_order`, and the plaintext keeps its padding, like `decrypt`.
+
+**Scoring and corpus.** The score is the bigram log-probability, the sum of log p(xy) over every pair of adjacent letters. The tables are built from two books from Project Gutenberg that are not used anywhere else in the project, so the test fragments are never part of the training text:
+
+| language | corpus | letters |
+|----------|--------|---------|
+| en | *The Adventures of Sherlock Holmes*, Arthur Conan Doyle (`data/english_corpus.txt`) | 431,477 |
+| es | *Marianela*, Benito Pérez Galdós (`data/spanish_corpus.txt`) | 227,775 |
+
+The text is normalised the same way as the ciphertext (A–Z only, no spaces), so pairs across word boundaries count too, as they do in the ciphertext. A pair that never appears in the corpus gets half a count instead of 0, so its log is very negative but finite. The most frequent pairs come out as TH, HE, IN for English and EN, ES, DE for Spanish.
+
+**Why single-letter frequencies are useless here.** A transposition only changes the order of the letters, so every candidate decryption has exactly the same letter counts and gets the same single-letter score, which can't tell them apart.
+
+**Measurement** (`experiments/measure_break_columnar.py`, seed 42). For each cell, 100 trials: a random fragment of the reference text, encrypted with a random keyword of n different letters and `X` padding. A trial counts only if the plaintext comes back exactly (with its padding).
+
+| length | n=4 | n=5 | n=6 | n=7 | | n=4 | n=5 | n=6 | n=7 |
+|--------|-----|-----|-----|-----|-|-----|-----|-----|-----|
+|        | **en** | | | | | **es** | | | |
+| 60     | 100% | 97% | 96% | 95% | | 100% | 100% | 100% | 98% |
+| 120    | 100% | 100% | 100% | 100% | | 100% | 100% | 100% | 100% |
+| 200    | 100% | 100% | 100% | 100% | | 100% | 100% | 100% | 100% |
+
+Bigrams are a much stronger signal than the letter or coset statistics in C2. Even 60 letters is almost always enough. The few failures are at 60 letters with more columns, where there are only 9–12 rows. Typically the order found is the true one shifted by a column, for example `(6, 5, 1, 4, 2, 3)` found as `(5, 1, 4, 2, 3, 6)`. That gives almost the same text and only changes the pairs where one row runs into the next. With so few rows, a handful of pairs decide, and the wrong text can score a little higher (−326.4 against −327.5 in that example).
+
+**Largest n under ten seconds.** Time for one attack on 200 letters (same script):
+
+| n | 4 | 5 | 6 | 7 | 8 | 9 |
+|---|---|---|---|---|---|---|
+| orders (n!) | 24 | 120 | 720 | 5,040 | 40,320 | 362,880 |
+| time | 0.00 s | 0.01 s | 0.04 s | 0.25 s | 1.95 s | 22.9 s |
+
+The largest n under ten seconds is **n = 8**. Each extra column multiplies the time by about n, so n = 9 already takes over 20 s and n = 10 would take about 4 minutes.
+
+**One approach to push the limit (not implemented): score column pairs instead of whole plaintexts.** Almost every bigram of the plaintext is made of a letter of some column i and the letter in the same row of the column j that goes right after it. So the score of an order is (almost exactly) the sum of the scores of its adjacent column pairs. You can compute an n × n table "how good is column j right after column i" once, and then an order is just a path that visits every column once, scored with n − 1 table lookups. That is the travelling salesman problem, which can be solved exactly with the Held–Karp dynamic programming in about 2ⁿ · n² steps instead of n! full decryptions: for n = 15 that is about 7 million steps instead of 1.3 · 10¹² orders. The pairs where one row wraps into the next add one correction term for the first and last column. For even larger n, the same table can be used with a local search (start from a greedy order and keep swapping columns while the score improves).
 
 
 
