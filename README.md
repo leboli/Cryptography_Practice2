@@ -2,7 +2,7 @@
 
 20357 Cryptography - Bachelor in Data Science and Engineering - Universidad CEU San Pablo, 2026/27
 
-**Author:** Lucia Eboli Courreges
+**Author:** Lucia Eboli Courreges 
 
 **Repository:** https://github.com/leboli/Cryptography_Practice2.git
 
@@ -83,38 +83,48 @@ On invalid input (a non-invertible `a`, a key that is not a permutation, a Vigen
 ## Measurements and tests
 
 ```
-py -m experiments.measure_break_caesar     # C1 table
-py -m experiments.measure_break_affine     # C2 table
-py -m experiments.measure_break_vigenere   # C3 tables
-py -m experiments.measure_assist           # C4 report on the given cryptogram
-py -m experiments.measure_index            # B1 index of coincidence vs length
-py -m experiments.measure_classify         # B2 cipher family classifier, X pad vs random pad
-py -m experiments.measure_attack_vigenere  # C2 automatic Vigenere attack, key and key length
-py -m experiments.measure_break_columnar   # C3 columnar breaker table and search time (~3 min)
-py -m experiments.measure_pipeline         # D mono / poly decision, midpoint vs clear-peak threshold
-py -m pytest -v                         # all the tests
+python -m experiments.measure_break_caesar     # Practice 1 C1 table
+python -m experiments.measure_break_affine     # Practice 1 C2 table
+python -m experiments.measure_break_vigenere   # Practice 1 C3 tables
+python -m experiments.measure_assist           # Practice 1 C4 report on the given cryptogram
+python -m experiments.measure_index            # B1 index of coincidence vs length
+python -m experiments.measure_classify         # B2 cipher family classifier, X pad vs random pad
+python -m experiments.measure_attack_vigenere  # C2 automatic Vigenere attack, key and key length
+python -m experiments.measure_break_columnar   # C3 columnar breaker table and search time (~3 min)
+python -m experiments.measure_pipeline         # D mono / poly decision, midpoint vs clear-peak threshold
+python -m pytest -v                            # all the tests
 ```
 
-Every measurement uses a fixed seed, so running it again gives the same numbers as the tables below.
+On Windows, `py` can be used instead of `python`. Every measurement uses a fixed seed, so running it again gives the same numbers as the tables below.
 
 # Tests
 
 From the root run (`pytest.ini` puts the project root on the import path, so both work):
 
 ```
-py -m pytest -v
+python -m pytest -v
 pytest -v
 ```
 
-Every cipher test file follows the same structure: the check values published in the handout, round-trip `decrypt(encrypt(m, k), k) == normalised m`, rejection of invalid keys, and edge cases (empty input, a single character, input with no letters, and for Vigenere input shorter than the key). `tests/test_crypto.py` runs `crypto.py` as a real process and checks every command, both input/output modes, and that invalid input exits with an error and no stack trace. Each breaker is tested on 20 generated ciphertexts per language at the length where the measurements below say it is reliable (Caesar 30 letters, affine 60, Vigenere ~40 letters per coset).
+Every cipher test file follows the same structure: the check values published in the handout, round-trip `decrypt(encrypt(m, k), k) == normalised m`, rejection of invalid keys, and edge cases (empty input, a single character, input with no letters, and for Vigenere input shorter than the key). `tests/test_crypto.py` runs `crypto.py` as a real process and checks every command, both input/output modes, and that invalid input exits with an error and no stack trace.
+
+Practice 2 tests:
+
+- `tests/transposition/ciphers/`: the rail fence and columnar check values, round trips for every length and several keys, padding kept by `decrypt`, the double transposition check value and round trips at every length, including plaintexts whose length is a multiple of neither key (and a test showing that the naive double decryption fails). Edge cases: empty input, a single character, no letters, a plaintext shorter than the key and a ciphertext that does not fill the grid.
+- `tests/analysis/`: the two B1 index values, the B2 classifier on transpositions and substitutions, the B3 Kasiski check values (positions of `ELQ`, longest repeat `ELQYRJ`, distances 15, 35, 50, factor tally), and `coset_ic` / `find_key_length`, including multiples and divisors of the key length.
+- Part C attacks on 20 generated ciphertexts per case, at lengths where the measurements say they are reliable: `find_key_length` and the automatic Vigenère `attack` for m = 3, 5, 7, 9 (300, 200, 300, 400 letters) in English and Spanish, and the columnar breaker for 4 to 7 columns.
+- `tests/test_attack.py`: the Part D pipeline on columnar, Vigenère (en and es) and monoalphabetic ciphertexts, the measurements printed in every case, too-short input, a `--cols` that does not divide the length, and a length with no divisor from 2 to 8.
+
+The Practice 1 breakers are tested on 20 generated ciphertexts per language as before (Caesar 30 letters, affine 60, Vigenère ~40 letters per coset).
 
 # Deviations from the handout
 
-[complete later]
-
-# Key spaces
-
-[complete later]
+- In the handout it says we can assume the input is normalized. My functions don't assume the input is already normalised: the ciphers, measurements (`index_of_coincidence`, `classify`, Kasiski, `coset_ic`), breakers and `attack.py` all normalise it themselves, so they accept raw text with spaces, lowercase letters and punctuation. I did this so I could use the reference texts as they are in the experiments and tests, and to make the code more robust: a caller that forgets to normalise gets the same result instead of a wrong one. The exception is `columnar.decrypt` (and so `decrypt_double`), which takes the ciphertext exactly as `encrypt` produced it.
+- `railfence` also accepts 1 rail (and any number of rails at least the text length), which leaves the text unchanged. 0 or fewer rails raise `ValueError`.
+- `columnar.decrypt` raises `ValueError` when the ciphertext length is not a multiple of the keyword length, since such a ciphertext cannot come from `encrypt`.
+- `decrypt_double` has an extra optional `pad` argument (default `"X"`), so it can undo an `encrypt_double` made with another pad letter.
+- `find_key_length` returns the `m` with the highest average when no `m` reaches the threshold (very short texts), instead of failing.
+- `attack.py` stops with an error if the ciphertext has fewer than two letters, if `--cols` does not divide the length, or if no column count from 2 to 8 divides it (then `--cols` has to be given).
 
 # Report
 
@@ -126,13 +136,13 @@ The check plaintext is 30 letters, which is a multiple of both 5 (`ROTOR`) and 6
 
 **What does `decrypt_double` have to do differently when the length is not a multiple of both, and why does a naive implementation return garbage?**
 
-When the length doesn't fit, both passes add `X`s, but in different places. The `X`s from the second pass end up at the end of the intermediate text, while the ones from the first pass are mixed inside it (and one of them can also be at the end). To undo a pass you need the exact length of its input, because that's what decides the shape of the grid.
+When the length doesn't fit, both passes add `X`s, but in different places. Pass 1 pads the plaintext up to a multiple of `len(kw1)`, and those `X`s get shuffled into the intermediate text with everything else (one can also land at the end). Pass 2 pads the intermediate text up to a multiple of `len(kw2)`, and when pass 2 is undone those `X`s are back at the end of the intermediate text. To undo a pass you need the exact length of its input, because that decides how many rows the grid has.
 
-So `decrypt_double` first undoes pass 2 without removing any `X` (`strip_pad=False`). Then it cuts the text back to the length it had after pass 1: the shortest length that is a multiple of `len(kw1)`, is less than `len(kw2)` letters shorter, and where everything cut off is `X`. Finally it undoes pass 1 with a normal `decrypt`, which removes the remaining padding.
+So `decrypt_double` first undoes pass 2 with `decrypt`, which keeps the padding. The result is the intermediate text followed by fewer than `len(kw2)` pad letters. Then it cuts the text back to the length it had after pass 1: the shortest length that is a multiple of `len(kw1)`, is less than `len(kw2)` letters shorter, and where everything cut off is pad. Finally it undoes pass 1 with `decrypt`, which returns the padded plaintext.
 
-The naive version, `decrypt(decrypt(c, kw2), kw1)`, removes every `X` at the end after the first step, including the ones from pass 1. For example, `ATTACKATDAWN` with `ROTOR` and `ENIGMA` gives `TANADXAKWCAXTTX` (15 letters) after pass 1. After undoing pass 2 and stripping, only `TANADXAKWCAXTT` (14 letters) is left, so the pass 1 grid has the wrong shape. My first version crashed with that input, and a version that allows short columns puts the letters in the wrong columns, so the whole text comes out scrambled, not just the end. The check value never shows this because with 30 letters there is no padding.
+The naive version, `decrypt(decrypt(c, kw2), kw1)`, passes the pass 2 padding into the first-pass decryption. For example, `ATTACKATDAWN` with `ROTOR` gives `TANADXAKWCAXTTX` (15 letters), and `ENIGMA` then gives `XXXTATACXNWXDAXAKT` (18). Undoing pass 2 gives `TANADXAKWCAXTTXXXX`: the 15 letters of the intermediate text plus the 3 pads of pass 2. 18 is not a multiple of 5, so the naive call fails straight away (`decrypt` raises an error). It is worse when the extra length happens to be a multiple of `len(kw1)`, because then there is no error. `ATTACKNOW` with `KEY` then `CIPHER` goes 9 → 9 → 12 letters, so the naive call reads the first grid with 4 rows instead of 3. Every column is cut in the wrong place and the whole text comes out scrambled, not just the end (`test_naive_decrypt_is_garbage`). The check value never shows this because with 30 letters there is no padding.
 
-One thing this can't fix: `X` is also the pad letter, so a plaintext that ends in a real `X` loses it.
+One thing this can't fix: `X` is also the pad letter, so when the intermediate text itself ends in `X`s, the cut is ambiguous. That needs real `X`s in the plaintext that pass 1 happens to move to the end, and room for a shorter cut (a second key longer than the first). For example, `IXE` with `AB` becomes `IEXX` after pass 1 and `IEXXXXX` after `KASISKI`. `decrypt_double` cuts it back to `IE` and returns `IE`, so the real `X` is lost. In the extreme case, `encrypt_double("AX", "A", "ABC")` and `encrypt_double("A", "A", "ABC")` both give `AXX`, so no decryption can tell them apart. A plaintext that just ends in `X` is usually fine: `ATTACKATDAWNX`, `RELAX` and `BOX` all come back correctly with `ROTOR`/`ENIGMA`, `KEY`/`CIPHER` and `AB`/`KASISKI`. Over 570 short plaintexts containing an `X`, with those three key pairs, 7 lost a letter.
 
 
 ## B: Measuring a ciphertext
@@ -387,10 +397,24 @@ For a transposition it runs the C3 breaker for `--cols`, or for every divisor of
 
 The midpoint never misreads a monoalphabetic text, but it lets through more than half of the 2-letter keys and a fifth of the 3-letter ones in English. The clear-peak threshold trades a few monoalphabetic errors at 100 letters (1% en, 7.3% es) for far fewer Vigenère errors, and from 200 letters the only real problem left is m = 2. Even there 13–19% of English 2-letter keys still read as monoalphabetic: the index of a 2-alphabet mix depends on how much the two shifted distributions overlap, and for some pairs of shifts it stays close to plain English. One number cannot separate those cases. Keys of 5 or more letters are practically never misread.
 
-[Question 9 paragraph]
+**The single number behind the first decision.** Before trying any attack, the pipeline commits to a family based on one number: the length-normalised chi-squared distance between the ciphertext's letter counts and the language table. That number depends on only one property of the cipher: **whether it keeps the plaintext's single-letter frequency distribution**. It does not look at the order of the letters or at which letter became which. A transposition keeps the distribution, and a substitution normally moves it, but the classifier only sees the result, not the mechanism. A cipher that would defeat it entirely is a homophonic substitution built to match the language's frequencies: each plaintext letter is replaced by one of several ciphertext letters, with the choices weighted so that the ciphertext as a whole has the letter frequencies of English. Its chi-squared distance is as low as a transposition's, so it is classified as "transposition", and the columnar breaker returns nonsense. Its index of coincidence is also close to English, so even if the first step were skipped, the second would call it monoalphabetic. The opposite mistake is just as easy: a transposition applied to text that was first substituted (the idea behind ADFGVX) has a very high chi-squared distance, so it is classified as "substitution", and the transposition is never looked for.
 
+## What does not work
 
+- **The pipeline only breaks columnar transpositions.** A rail fence (or double transposition) ciphertext is correctly classified as a transposition, but then the columnar breaker runs on it and prints garbage. There is no rail fence or double transposition breaker.
+- **Column counts.** Without `--cols`, a ciphertext whose length has no divisor from 2 to 8 (for example a prime length) is rejected. With `--cols` 9 or more the exhaustive search is slow (about 23 s for 9 columns, minutes for 10), and the breaker needs the full padded ciphertext: a ciphertext whose padding was removed cannot be decrypted at all.
+- **Pad letter equal to a real letter.** When real `X`s of the plaintext end up at the end of the intermediate text, `decrypt_double` cannot tell them from padding and can cut them (see A3; 7 of 570 short test plaintexts containing an `X`).
+- **Short or unlucky inputs.** At 60 letters, 4.7% of `X`-padded transpositions are classified as substitutions, and 2–7% of monoalphabetic substitutions are classified as transpositions at every length tested (B2). In the pipeline, 13–19% of English 2-letter Vigenère keys are read as monoalphabetic even at 200–300 letters. 3-letter keys with a repeated letter can be read as key length 1 (C2). At 60 letters with 5–7 columns, 3–5% of columnar ciphertexts come back with the order shifted by one column (C3).
+- **Monoalphabetic ciphers are not solved automatically.** The pipeline prints the frequency assistant, as the handout allows.
+- **Accented letters through stdin on Windows** can arrive broken. Use `--in` for Spanish text.
 
 # Use of LLM assistants
 
 For this project I used Claude Code for the following:
+
+- **Tests:** generating tests for the ciphers, measurements, attacks and pipeline.
+- **Code:** fixing bugs and making the code more robust (edge cases, input validation, clear errors instead of crashes).
+- **README:** helping me write the answers to the report questions.
+- **Review:** checking the finished submission against the handout to find missing items.
+
+I reviewed and edited all the generated tests, code and text before including them, and I ran the tests and the measurement scripts myself to check that they work and that the numbers in this report are the ones they produce.

@@ -1,9 +1,13 @@
+import random
+
 import pytest
 
 from analysis.keylength import RANDOM_IC, coset_ic, find_key_length, language_ic
 from analysis.measure import index_of_coincidence
 from substitution.cyphers.vigenere import encrypt
+from utils.basics import ALPHABET
 from utils.constants import ENGLISH_TEXT, SPANISH_TEXT
+from tests.helpers import random_fragments
 
 
 class TestCosetIc:
@@ -56,6 +60,16 @@ class TestFindKeyLength:
     @pytest.mark.parametrize("key", ["CLAVE", "QUIJOTE", "MANCHAZ"])
     def test_spanish(self, key):
         assert find_key_length(encrypt(SPANISH_TEXT, key), language="es") == len(key)
+
+    # From the C2 measurement: lengths where the key length is found reliably.
+    @pytest.mark.parametrize("m, length", [(3, 300), (5, 200), (7, 300), (9, 400)])
+    @pytest.mark.parametrize("text, language", [(ENGLISH_TEXT, "en"), (SPANISH_TEXT, "es")])
+    def test_20_generated_ciphertexts(self, text, language, m, length):
+        # keys without repeated letters (a repeated letter in a 3-letter key can pass as m = 1)
+        rng = random.Random(m)
+        for fragment in random_fragments(text, length, count=20, seed=m):
+            key = "".join(rng.sample(ALPHABET, m))
+            assert find_key_length(encrypt(fragment, key), language=language) == m
 
     def test_not_a_multiple(self):
         # 6, 9, 12 are as high as 3, the rule has to pick the smallest
