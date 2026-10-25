@@ -50,6 +50,26 @@ Frequency report for a monoalphabetic ciphertext (C4):
 python crypto.py assist --in cipher.txt
 ```
 
+Transposition ciphers and measurements:
+
+```
+python crypto.py railfence encrypt --rails 3  --in message.txt
+python crypto.py railfence decrypt --rails 3  --in cipher.txt
+python crypto.py columnar  encrypt --key CIPHER [--pad X] --in message.txt
+python crypto.py columnar  decrypt --key CIPHER --in cipher.txt
+python crypto.py measure ic       --in cipher.txt
+python crypto.py measure classify --in cipher.txt [--lang es]
+python crypto.py measure kasiski  --in cipher.txt
+```
+
+## Automatic attack (`attack.py`, Part D)
+
+```
+python attack.py --in cipher.txt [--lang en|es] [--cols N]
+```
+
+It prints the measurements it used (length, index of coincidence, chi-squared against its threshold, family, and then the IC threshold, coset table or bigram scores) followed by the result.
+
 Commands can also be chained through pipes, for example:
 
 ```
@@ -71,6 +91,7 @@ py -m experiments.measure_index            # B1 index of coincidence vs length
 py -m experiments.measure_classify         # B2 cipher family classifier, X pad vs random pad
 py -m experiments.measure_attack_vigenere  # C2 automatic Vigenere attack, key and key length
 py -m experiments.measure_break_columnar   # C3 columnar breaker table and search time (~3 min)
+py -m experiments.measure_pipeline         # D mono / poly decision, midpoint vs clear-peak threshold
 py -m pytest -v                         # all the tests
 ```
 
@@ -341,6 +362,32 @@ Bigrams are a much stronger signal than the letter or coset statistics in C2. Ev
 The largest n under ten seconds is **n = 8**. Each extra column multiplies the time by about n, so n = 9 already takes over 20 s and n = 10 would take about 4 minutes.
 
 **One approach to push the limit (not implemented): score column pairs instead of whole plaintexts.** Almost every bigram of the plaintext is made of a letter of some column i and the letter in the same row of the column j that goes right after it. So the score of an order is (almost exactly) the sum of the scores of its adjacent column pairs. You can compute an n × n table "how good is column j right after column i" once, and then an order is just a path that visits every column once, scored with n − 1 table lookups. That is the travelling salesman problem, which can be solved exactly with the Held–Karp dynamic programming in about 2ⁿ · n² steps instead of n! full decryptions: for n = 15 that is about 7 million steps instead of 1.3 · 10¹² orders. The pairs where one row wraps into the next add one correction term for the first and last column. For even larger n, the same table can be used with a local search (start from a greedy order and keep swapping columns while the score improves).
+
+## D: The pipeline
+
+`attack.py` decides in two steps:
+
+1. **Family.** `classify` from B2: chi-squared per letter against the language table, with the threshold measured there (2.214). A transposition keeps the language's letter counts, so it falls below.
+2. **Mono or poly.** For a substitution, the index of coincidence is compared with the same "clearly above the baseline" threshold as C1: 3/4 of the way from random text (1/26 = 0.0385) to the language (sum of p², 0.0655 for English), so 0.0588. A monoalphabetic cipher only renames the letters, so its index stays at the language value; a Vigenère cipher mixes several alphabets and pulls it down towards random. In other words, "monoalphabetic" means key length 1 already passes. I first tried the midpoint between random and the language (0.0520 en, 0.0564 es), but a 2-letter key has an expected index of exactly that midpoint, so the decision for it was a coin flip. Above the threshold it prints the C4 frequency assistant; below it, it prints the coset IC table for m = 1..16, picks the key length with `find_key_length` (C1) and runs `break_vigenere`.
+
+For a transposition it runs the C3 breaker for `--cols`, or for every divisor of the length from 2 to 8, and keeps the result with the highest bigram log-probability. All candidates decrypt the same letters, so they have the same number of bigrams and their scores can be compared directly.
+
+**Measurement** (`experiments/measure_pipeline.py`, seed 1). For each length, 300 random fragments encrypted with a random monoalphabetic key and 300 with a random Vigenère key of each length m. The table gives how often the index lands on the wrong side of the threshold: "mono" is a monoalphabetic text read as polyalphabetic, the m columns are Vigenère texts read as monoalphabetic.
+
+| length | mono | m=2 | m=3 | m=5 | | mono | m=2 | m=3 | m=5 |
+|--------|------|-----|-----|-----|-|------|-----|-----|-----|
+| **midpoint** | **en** | | | | | **es** | | | |
+| 100    | 0.0% | 57.0% | 30.3% | 6.7% | | 0.0% | 35.0% | 12.7% | 1.0% |
+| 200    | 0.0% | 64.3% | 27.3% | 4.0% | | 0.0% | 30.3% | 8.0% | 0.3% |
+| 300    | 0.0% | 68.3% | 20.0% | 1.3% | | 0.0% | 36.3% | 9.3% | 0.3% |
+| **clear-peak (used)** | **en** | | | | | **es** | | | |
+| 100    | 1.0% | 23.0% | 8.0% | 0.3% | | 7.3% | 8.0% | 0.7% | 0.0% |
+| 200    | 0.0% | 19.0% | 4.7% | 0.0% | | 0.0% | 4.7% | 0.7% | 0.0% |
+| 300    | 0.0% | 13.0% | 0.7% | 0.0% | | 0.0% | 3.7% | 0.0% | 0.0% |
+
+The midpoint never misreads a monoalphabetic text, but it lets through more than half of the 2-letter keys and a fifth of the 3-letter ones in English. The clear-peak threshold trades a few monoalphabetic errors at 100 letters (1% en, 7.3% es) for far fewer Vigenère errors, and from 200 letters the only real problem left is m = 2. Even there 13–19% of English 2-letter keys still read as monoalphabetic: the index of a 2-alphabet mix depends on how much the two shifted distributions overlap, and for some pairs of shifts it stays close to plain English. One number cannot separate those cases. Keys of 5 or more letters are practically never misread.
+
+[Question 9 paragraph]
 
 
 

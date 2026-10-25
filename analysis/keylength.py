@@ -20,8 +20,12 @@ def language_ic(language: str) -> float:
     return sum(p * p for p in frequency_table(language).values())
 
 
+def clear_threshold(language: str) -> float:
+    return RANDOM_IC + CLEAR_FRACTION * (language_ic(language) - RANDOM_IC)
+
+
 def find_key_length(ciphertext: str, max_m: int = 16, language: str = "en") -> int:
-    threshold = RANDOM_IC + CLEAR_FRACTION * (language_ic(language) - RANDOM_IC)
+    threshold = clear_threshold(language)
     averages = {m: coset_ic(ciphertext, m) for m in range(1, max_m + 1)}
 
     # multiples of the key length are just as high, so take the first one that passes

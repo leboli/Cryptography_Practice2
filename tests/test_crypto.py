@@ -60,6 +60,31 @@ def test_assist():
     assert "FREQUENCY ASSISTANT REPORT" in result.stdout
 
 
+def test_railfence():
+    result = cli("railfence", "encrypt", "--rails", "3", stdin="MYSECRETMESSAGE")
+    assert result.stdout.strip() == "MCMAYERTESGSESE"
+    result = cli("railfence", "decrypt", "--rails", "3", stdin="MCMAYERTESGSESE")
+    assert result.stdout.strip() == "MYSECRETMESSAGE"
+
+
+def test_columnar_files(tmp_path):
+    message, cipher = tmp_path / "message.txt", tmp_path / "cipher.txt"
+    message.write_text("MYSECRETMESSAGE", encoding="utf-8")
+    assert cli("columnar", "encrypt", "--key", "CIPHER", "--in", str(message), "--out", str(cipher)).returncode == 0
+    assert cipher.read_text(encoding="utf-8").strip() == "MEACSXEEXYTGSMERSX"
+    result = cli("columnar", "decrypt", "--key", "CIPHER", "--in", str(cipher))
+    assert result.stdout.strip() == "MYSECRETMESSAGEXXX"
+
+
+def test_measure():
+    assert cli("measure", "ic", stdin="CRYPTANALYSIS").stdout.strip() == "0.0385"
+    assert cli("measure", "classify", stdin=TEXT).stdout.strip() == "transposition"
+    kasiski = cli("measure", "kasiski",
+                  stdin="ELQYRJVQDRLXEGBELQQVALQFEPTQOGDEZRGSIDSCPEFGOPXDOLELQYRJXAOALPKGVD").stdout
+    assert "ELQ: [0, 15, 50]" in kasiski
+    assert "distances: [15, 35, 50]" in kasiski
+
+
 def test_invalid_inputs_exit_cleanly():
     cases = [
         cli("affine", "encrypt", "--a", "13", "--b", "1", stdin=TEXT),
