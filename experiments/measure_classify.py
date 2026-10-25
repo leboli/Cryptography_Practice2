@@ -8,7 +8,7 @@ from utils.basics import ALPHABET, normalise
 from utils.constants import ENGLISH_FREQUENCY_TABLE, ENGLISH_TEXT
 
 LENGTHS = [60, 120, 250, 400]
-SAMPLES = 150              # per length and per cipher
+SAMPLES = 150              
 KEY_LENGTHS = range(4, 11)  # columnar keywords of 4..10 letters
 CALIBRATION_SEED = 1
 TEST_SEED = 42

@@ -200,6 +200,28 @@ That is 1.8 times the threshold of 2.214. The padding alone, before counting any
 
 Padding must not change the statistics of the text. Don't pad with a fixed character, and especially not with a rare one. Draw the pad letters at random from the letter distribution of the language, so they look like the rest of the message. A constant pad is a recognisable pattern that leaks information about the cipher (here it gives away the cipher family) and gets worse the shorter the message is.
 
+### B3: Kasiski examination
+
+`repeats` finds every sequence of at least `min_len` letters that appears more than once, with all its positions. `distances` takes every pair of positions of every repeat and returns the distinct distances, sorted. `factor_tally` counts, for each factor from 2 to `max_factor`, how many of those distances it divides (1 is left out because it divides everything).
+
+On the check ciphertext, `ELQ` is at 0, 15 and 50, and the longest repeat is `ELQYRJ` at 0 and 50. There are 10 repeats in total, because every piece of `ELQYRJ` (`LQY`, `ELQYR`, ...) also repeats at distance 50. These all give the same gap, and since `distances` keeps each distance once, the result is `[15, 35, 50]`. The tally is:
+
+| factor | 2 | 3 | 4 | 5 | 6 | 7 | 8..20 |
+|--------|---|---|---|---|---|---|-------|
+| count  | 1 | 1 | 0 | **3** | 0 | 1 | 0 (except 10 → 1, 15 → 1) |
+
+5 divides all three distances, and no larger factor divides more than one.
+
+**The gcd of those three distances is 5, which is the right answer. Explain why `factor_tally` must not be replaced by a gcd, and give the condition under which the gcd silently fails.**
+
+A repeat in a Vigenère ciphertext can come from two things. Either the same plaintext was encrypted at the same position of the key, and then the distance is a multiple of the key length. Or two different pieces of plaintext happened to give the same ciphertext letters, and then the distance can be anything. The ciphertext alone can't tell these apart.
+
+The gcd needs every distance to be a multiple of the key length. One accidental distance is enough to ruin it: gcd(15, 35, 50, 52) = 1. It doesn't give a warning or a "maybe", it just returns a wrong number (usually 1 or a small divisor of the real length). The tally only counts, so an accidental distance adds 1 to a few wrong factors and the real key length still has the highest count among the large factors. You look for the largest factor that still divides most of the distances, not all of them.
+
+This happens with real text. Encrypting the English reference text with `LEMON` gives 98 distinct distances. 70 of them are multiples of 5, and the gcd of all 98 is **1**. The tally still points at 5 (70 distances), well ahead of 10 (36) and 15 (22). The same happens with `CIPHER` (6) and `SECRETS` (7) in the tests.
+
+**Condition under which the gcd silently fails:** whenever at least one distance is not a multiple of the key length, that is, whenever there is a single accidental repeat. The longer the ciphertext, the more accidental repeats there are, so the gcd gets worse with more data, the opposite of what you'd expect from a statistical test. It also fails the other way when all the distances happen to share an extra factor (for example they are all multiples of 10 when the key length is 5): then it returns a multiple of the key length. That one is less of a problem, since with more repeats the extra factor usually disappears.
+
 
 
 # Use of LLM assistants
