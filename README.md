@@ -67,6 +67,8 @@ py -m experiments.measure_break_caesar     # C1 table
 py -m experiments.measure_break_affine     # C2 table
 py -m experiments.measure_break_vigenere   # C3 tables
 py -m experiments.measure_assist           # C4 report on the given cryptogram
+py -m experiments.measure_index            # B1 index of coincidence vs length
+py -m experiments.measure_classify         # B2 cipher family classifier, X pad vs random pad
 py -m pytest -v                         # all the tests
 ```
 
@@ -85,206 +87,121 @@ Every cipher test file follows the same structure: the check values published in
 
 # Deviations from the handout
 
-- **Folder layout.** The modules are grouped in folders instead of sitting at the root (only `crypto.py` is at the root): `utils/basics.py`, `substitution/cyphers/{caesar,affine,monoalpha,vigenere}.py`, `substitution/breakers/{break_caesar,break_affine,break_vigenere,assist}.py`, `experiments/measure_*.py`. Function names and signatures are exactly the ones in the handout.
-- **Accents are folded, not dropped.** Input is normalised to uppercase A-Z as required, but accented letters are first reduced to their base letter (`É -> E`, `Ñ -> N`) instead of being removed, so Spanish text keeps all its letters. Because of this, the frequency of Ñ is added to N in the Spanish table.
-- **Unknown languages are rejected.** Any `language` other than `"en"` or `"es"` raises `ValueError`.
+[complete later]
 
 # Key spaces
 
-| Cipher | Key | Key space | ~bits |
-|--------|-----|-----------|-------|
-| Caesar | shift k in 0..25 | 26 | 4.7 |
-| Affine | (a, b), gcd(a, 26) = 1 | 12 x 26 = 312 | 8.3 |
-| Monoalphabetic | permutation of A-Z | 26! ~ 4.03 x 10^26 | 88.4 |
-| Vigenere | keyword of length m | 26^m | 4.7 m |
+[complete later]
 
-- **Caesar.** Any integer works as a key, but shifts are taken mod 26, so `k` and `k + 26` encrypt the same way. That leaves 26 different keys, and one of them (`k = 0`) does nothing, so only 25 are actually useful.
-- **Affine.** `E(x) = (a x + b) mod 26`. For decryption `a` needs an inverse mod 26, which only exists when `gcd(a, 26) = 1`. Since 26 = 2 x 13, that rules out every even number and 13, leaving phi(26) = 12 values of `a` (1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25). `b` can be any of the 26 shifts. So `valid_keys()` returns **312** pairs. Values of `a` or `b` outside 0..25 are the same keys again after reducing mod 26, so they don't add new ones. Note that the 26 pairs with `a = 1` are just the Caesar keys.
-- **Monoalphabetic.** The key is any ordering of the 26 letters. The first letter can go to 26 places, the second to 25, and so on, so there are 26! ~ 4.03 x 10^26 keys (about 2^88). `key_from_keyword` only reaches a small part of these (the tail of the key is always in alphabetical order), but the cipher itself accepts any permutation.
-- **Vigenere.** Each of the m key letters is an independent shift, so there are 26^m keys of length m. If the attacker doesn't know m, it's the sum over all lengths up to some maximum. Some of these keys are repeats (for example `ABAB` is the same key as `AB`), so the real count is a little lower, but 26^m is the usual figure.
+# Report
 
-# C - Breakers
+## A : Transposition ciphers
 
-## C1 - Caesar breaker
+### A3: Double transposition
 
-Run the measurements:
+The check plaintext is 30 letters, which is a multiple of both 5 (`ROTOR`) and 6 (`ENIGMA`), so no padding is added in either pass and decrypting twice just works.
 
-```
-py -m experiments.measure_break_caesar
-```
+**What does `decrypt_double` have to do differently when the length is not a multiple of both, and why does a naive implementation return garbage?**
 
-Recovery rate (200 fragments per length, fixed seed):
+When the length doesn't fit, both passes add `X`s, but in different places. The `X`s from the second pass end up at the end of the intermediate text, while the ones from the first pass are mixed inside it (and one of them can also be at the end). To undo a pass you need the exact length of its input, because that's what decides the shape of the grid.
 
-| len | EN/EN | EN/ES | ES/ES | ES/EN |
-|-----|-------|-------|-------|-------|
-| 20  | 95.0% | 65.0% | 99.0% | 57.0% |
-| 30  | 100%  | 62.5% | 100%  | 77.5% |
-| 40  | 100%  | 68.5% | 100%  | 83.0% |
-| 60  | 100%  | 68.5% | 100%  | 93.5% |
-| 100 | 100%  | 65.5% | 100%  | 100%  |
+So `decrypt_double` first undoes pass 2 without removing any `X` (`strip_pad=False`). Then it cuts the text back to the length it had after pass 1: the shortest length that is a multiple of `len(kw1)`, is less than `len(kw2)` letters shorter, and where everything cut off is `X`. Finally it undoes pass 1 with a normal `decrypt`, which removes the remaining padding.
 
-(EN/EN = english text with english table, EN/ES = english text with spanish table, ES/ES = spanish text with spanish table, ES/EN = spanish text with english table)
+The naive version, `decrypt(decrypt(c, kw2), kw1)`, removes every `X` at the end after the first step, including the ones from pass 1. For example, `ATTACKATDAWN` with `ROTOR` and `ENIGMA` gives `TANADXAKWCAXTTX` (15 letters) after pass 1. After undoing pass 2 and stripping, only `TANADXAKWCAXTT` (14 letters) is left, so the pass 1 grid has the wrong shape. My first version crashed with that input, and a version that allows short columns puts the letters in the wrong columns, so the whole text comes out scrambled, not just the end. The check value never shows this because with 30 letters there is no padding.
 
-1) **At which length does the breaker become reliable?**
+One thing this can't fix: `X` is also the pad letter, so a plaintext that ends in a real `X` loses it.
 
-   From 20 letters it's already above 90% with the right table, and by 30 letters it's basically always right (100% in my runs). Below that there just isn't enough text for chi-squared to tell the real key apart from the other 25 shifts.
 
-2) **How much does the wrong language table cost you?**
+## B: Measuring a ciphertext
 
-   It depends on which table is wrong. Using the English table on Spanish text starts off costly for short texts (35% worse at 20 letters) but that gap almost disappears by 100 letters, so more ciphertext fixes it. Using the Spanish table on English text is worse and doesn't get better with length, it stays wrong a lot of the time even at 100 letters. Looking at the failures at 100 letters, about two thirds of them pick the key off by exactly 13: under that wrong shift the common English letters N, R and H land on A, E and U, which are exactly the letters Spanish uses most, so the wrong decryption genuinely looks more Spanish than the right one. That is a systematic error, not noise, which is why more ciphertext doesn't fix it, and why guessing the wrong table isn't equally bad in both directions.
+### B1: Index of coincidence
 
-## Frequency tables and reference texts
+**CRYPTANALYSIS is an English word whose index equals that of uniformly random letters. State the shortest text length at which you would trust this measurement, and how you decided.**
 
-All tables are in `utils/constants.py`:
+CRYPTANALYSIS has 13 letters, and only A, S and Y appear twice, so its IC is 6 / (13 x 12) = 1/26 ~ 0.0385, the value for random letters. For English the expected value is about 0.066 (the sum of the squared frequencies in the table).
 
-- English letter frequencies: https://es.sttmedia.com/frecuencias-de-letras-ingles
-- Spanish letter frequencies: https://es.sttmedia.com/frecuencias-de-letras-espanol (the frequency of Ñ is added to N, see Deviations)
-- English bigrams and trigrams (for the C4 report): https://en.wikipedia.org/wiki/Bigram and https://en.wikipedia.org/wiki/Trigram
-- Spanish bigrams and trigrams (for the C4 report): https://elladodelmal.com (accents removed)
+To find the length, I ran an experiment (`py -m experiments.measure_index`). For each length it takes 1000 random fragments of the English reference text and 1000 strings of uniformly random letters, computes the IC of each, and labels it "English" if it is above the midpoint between the two values (0.052). 
 
-The measurement fragments are taken from public-domain texts: the start of *Pride and Prejudice* (Jane Austen) plus the Gettysburg Address for English (1033 letters), and the start of *Don Quijote* (Cervantes) without accents for Spanish (853 letters).
+| len | EN mean | EN std | random mean | random std | EN correct | random correct |
+|-----|---------|--------|-------------|------------|------------|----------------|
+| 13  | 0.0631 | 0.0281 | 0.0380 | 0.0221 | 51.7%  | 83.0%  |
+| 20  | 0.0665 | 0.0205 | 0.0380 | 0.0141 | 77.1%  | 82.3%  |
+| 30  | 0.0669 | 0.0149 | 0.0385 | 0.0090 | 85.9%  | 91.4%  |
+| 40  | 0.0675 | 0.0117 | 0.0386 | 0.0069 | 93.7%  | 96.1%  |
+| 50  | 0.0683 | 0.0095 | 0.0386 | 0.0052 | 97.6%  | 98.8%  |
+| 60  | 0.0688 | 0.0085 | 0.0385 | 0.0048 | 100%   | 98.9%  |
+| 80  | 0.0690 | 0.0066 | 0.0385 | 0.0034 | 100%   | 99.9%  |
+| 100 | 0.0692 | 0.0055 | 0.0385 | 0.0029 | 100%   | 100%   |
 
-## C2 - Affine breaker
+The averages are already right at 13 letters, so the problem is not bias but spread. At 13 letters the standard deviation of English fragments (0.028) is bigger than the whole gap between English and random (0.027), so a single short text can land almost anywhere. Only half of the 13-letter English fragments look like English, and CRYPTANALYSIS is one of the ones that doesn't.
 
-Run the measurements:
+I would trust the measurement from about **50 letters**: it is the first length where both English and random text are classified correctly at least 95% of the time, and from 60 letters it is around 99-100%.
 
-```
-py -m experiments.measure_break_affine
-```
+### B2: Cipher family classifier
 
-Recovery rate (200 fragments per length, fixed seed):
+`classify` computes the chi-squared distance between the ciphertext and the language table with the scoring function from Practice 1 (`chi_squared`, which already divides by the number of letters). A transposition keeps the letters of the plaintext, so its distance is small. A substitution replaces them, so it is large. If the score is at most `CHI_THRESHOLD` the answer is "transposition", otherwise "substitution".
 
-| len | EN/EN | EN/ES | ES/ES | ES/EN |
-|-----|-------|-------|-------|-------|
-| 20  | 84.0% | 34.0% | 89.0% | 44.0% |
-| 30  | 96.5% | 35.5% | 99.5% | 49.5% |
-| 40  | 99.5% | 33.0% | 99.5% | 61.0% |
-| 60  | 100%  | 40.0% | 100%  | 68.0% |
-| 100 | 100%  | 41.0% | 100%  | 86.5% |
+*Setup* (`py -m experiments.measure_classify`). Samples are random fragments of the English reference text (1033 letters). The length is the number of plaintext letters, so a columnar ciphertext can be a few letters longer because of padding. Columnar keys are random keywords of 4 to 10 distinct letters (so 0 to 9 pad characters) and monoalphabetic keys are random permutations of the alphabet. There are 150 columnar and 150 monoalphabetic samples per length.
 
-(EN/EN = english text with english table, EN/ES = english text with spanish table, ES/ES = spanish text with spanish table, ES/EN = spanish text with english table)
+**Choosing the threshold:** I generated a separate calibration set (seed 1, X padding, same sizes, 1200 samples), tried every cut point between two consecutive scores, and kept the one with the fewest errors: **2.214** (24 errors out of 1200). The error tables below come from new samples (seed 42), so the threshold is not measured on the data that chose it. I calibrated with X because it is the default pad of `encrypt`.
 
-1) **How many candidates did you test, and why is that the right number?**
+Scores on the calibration set:
 
-   312 candidates per call: 12 valid values of `a` times 26 values of `b`. The valid `a` values are exactly the integers in 1..25 that are coprime with 26 (1, 3, 5, 7, 9, 11, 15, 17, 19, 21, 23, 25) . Any `a` sharing a factor with 26 isn't invertible mod 26, so it can't be a real affine key and decrypting with it would just be wrong. That's the whole key space, so testing all 312 is both necessary and sufficient. There's no valid key outside this set, and skipping any of them risks missing the real one.
+| len | transposition max (pad X) | transposition max (random pad) | substitution min |
+|-----|---------------------------|--------------------------------|------------------|
+| 60  | 3.206 | 0.627 | 0.865 |
+| 120 | 1.625 | 0.400 | 1.742 |
+| 250 | 0.438 | 0.214 | 1.858 |
+| 400 | 0.195 | 0.117 | 1.370 |
 
-2) **What's the shortest length at which recovery is reliable, and how does that compare to C1?**
+*Error rates.* For the second table I changed only the `pad` argument: for every message, one letter is drawn with the English frequencies and passed as `pad`, instead of `X`. Same threshold in both.
 
-   With the right table, affine only gets to 100% at 60 letters, versus 30 letters for the Caesar breaker in C1 (twice as much text needed). 
-   
-   The reason is the size of the key space: Caesar only has to pick the right answer out of 26 shifts, while affine has to pick it out of 312 (a, b) pairs. With a short, noisy fragment, chi-squared scores for the wrong keys are close together, and a bigger haystack of wrong keys means a higher chance that some wrong one scores lower than the true key just by luck. More ciphertext narrows the score gaps enough for the true key to win, so affine simply needs more letters to reach the same reliability.
+| len | pad X: trans | pad X: subs | pad X: total | random pad: trans | random pad: subs | random pad: total |
+|-----|------|------|------|------|------|------|
+| 60  | 4.7% | 2.7% | 3.7% | 0.0% | 2.0% | 1.0% |
+| 120 | 0.0% | 4.0% | 2.0% | 0.0% | 5.3% | 2.7% |
+| 250 | 0.0% | 4.7% | 2.3% | 0.0% | 3.3% | 1.7% |
+| 400 | 0.0% | 7.3% | 3.7% | 0.0% | 5.3% | 2.7% |
 
-## C3 - Vigenere breaker
+("trans" is the share of transpositions called substitution, "subs" the share of substitutions called transposition.)
 
-Run the measurements:
+**At which lengths does the classifier work, and at which does it fail?**
 
-```
-py -m experiments.measure_break_vigenere
-```
+The total error is below 4% at every length, but the two kinds of error behave differently.
 
-Recovery rate (100 fragments per combination, fixed seed), each own-language text with its own table:
+- Transpositions are only misclassified at 60 letters with X padding (4.7%). With random padding no transposition was misclassified at any length.
+- Substitutions have an error of 2-7% that does not go down with length. For a substitution, the normalised score tends to a fixed value that depends on the key, not on the length. Some random keys happen to send frequent letters to other frequent letters, and their score settles below 2.214 (the lowest substitution score was 0.865 at 60 letters and still 1.370 at 400). Longer text doesn't help with these keys. What would help is a lower threshold, and with random padding one could be used: every transposition scored below 0.63. The threshold is 2.214 because the short X-padded transpositions, which go up to 3.2, push it up.
 
-**m = 3**
+So the classifier works from about 120 letters. At 60 letters it fails on transpositions when they are padded with `X`. And the high threshold that X padding forces adds a few percent of substitution errors at every length.
 
-| len | EN    | ES    | ~coset len |
-|-----|-------|-------|------------|
-| 60  | 89.0% | 91.0% | 20.0       |
-| 120 | 100%  | 100%  | 40.0       |
-| 200 | 100%  | 100%  | 66.7       |
-| 300 | 100%  | 100%  | 100.0      |
+**Changing only the pad character moves the error rate substantially. Explain the mechanism.**
 
-**m = 5**
+Chi-squared divides each squared difference by the *expected* count, so a letter that should be rare weighs a lot. `X` has frequency 0.002, so a 60-letter English text is expected to contain 0.12 X's. A columnar ciphertext with `k` pad X's adds a term of about k² / (N² · 0.002) to the normalised score, which grows with the square of the number of pads and falls with the square of the length. In the worst case of my setup (9 pads):
 
-| len | EN    | ES    | ~coset len |
-|-----|-------|-------|------------|
-| 60  | 49.0% | 55.0% | 12.0       |
-| 120 | 93.0% | 96.0% | 24.0       |
-| 200 | 100%  | 100%  | 40.0       |
-| 300 | 100%  | 100%  | 60.0       |
+| len | 9 X pads alone add |
+|-----|--------------------|
+| 60  | 8.47 |
+| 120 | 2.42 |
+| 250 | 0.60 |
+| 400 | 0.24 |
 
-**m = 7**
+At 60 letters the padding alone is several times the threshold. At 400 it disappears into the noise. That is why the transposition errors are all at the short length.
 
-| len | EN    | ES    | ~coset len |
-|-----|-------|-------|------------|
-| 60  | 13.0% | 17.0% | 8.6        |
-| 120 | 72.0% | 77.0% | 17.1       |
-| 200 | 95.0% | 100%  | 28.6       |
-| 300 | 100%  | 100%  | 42.9       |
+A pad drawn from the English distribution is, most of the time, a common letter whose expected count is already large, so a few more copies barely change the score. For example, 6 `E`s added to 60 letters add only about 0.05, while 6 `Z`s would add about 13.8. The ciphertext then keeps the shape of English, and the transposition scores stay tight (max 0.63 at 60 letters instead of 3.2).
 
-(`~coset len` = the average number of letters each individual Caesar sub-problem gets)
+**Compute, for a 66-letter ciphertext containing 6 pad characters, how much the pad alone contributes to the chi-squared statistic. Compare that number with your threshold.**
 
-1) **What actually governs whether this works: total ciphertext length, or something else?**
+Expected number of X's in 66 English letters: 0.002 × 66 = 0.132. With 6 pad X's (and no real X), that term of the sum is
+(6 − 0.132)² / 0.132 = 34.43 / 0.132 ≈ 260.9, and normalised by the length, 260.9 / 66 ≈ **3.95**.
 
-   It's the coset length (len / m), not the total length. Look at len=60 with m=3 (coset len 20, 89-91% recovery) versus len=120 with m=7 (coset len 17.1, 72-77% recovery): the second one has *twice* the total ciphertext but does worse, because it's split across more cosets. Meanwhile len=200,m=7 (coset len 28.6, 95-100%) beats len=60,m=3 (coset len 20, 89-91%) despite having a longer key, simply because each coset still gets more letters. Rows with similar coset lengths land at similar recovery rates regardless of m or total length, which is the giveaway that coset length is the real variable, matching the same length-vs-reliability curve I saw for plain Caesar in C1.
+That is 1.8 times the threshold of 2.214. The padding alone, before counting any of the 60 real letters, is enough for the classifier to call a transposition a substitution.
 
-2) **Why does a longer key make Vigenere stronger even though the cipher itself hasn't changed?**
+**State the design rule this implies for anyone building a cipher that needs padding.**
 
-   Breaking Vigenere with a known key length is just running the C1 Caesar attack m times, once per coset, and each coset only gets roughly 1/m of the ciphertext's letters. Chi-squared needs enough letters to tell the true shift's frequency profile apart from the other 25 by more than sampling noise; the same weakness reflected in C1. A longer key doesn't touch how any individual position is encrypted (it's still a Caesar shift), but it thins out how much evidence the attacker gets per key position, since the same ciphertext now has to cover more independent shifts. So the extra strength isn't in the encryption step, it's that a longer key starves each subproblem of the sample size cryptanalysis needs. Given enough ciphertext this advantage disappears (as the 300-length column shows, everything reaches 100% eventually), so "longer key = stronger" really means "stronger per unit of ciphertext available to the attacker."
+Padding must not change the statistics of the text. Don't pad with a fixed character, and especially not with a rare one. Draw the pad letters at random from the letter distribution of the language, so they look like the rest of the message. A constant pad is a recognisable pattern that leaks information about the cipher (here it gives away the cipher family) and gets worse the shorter the message is.
 
-## C4 - Frequency assistant for monoalphabetic substitution
 
-Run it on the given cryptogram (and check the mapping against the real key):
-
-```
-py -m experiments.measure_assist
-```
-
-The cryptogram (110 letters, 22 distinct):
-
-```
-QATNT YSMHQ XJOCY HKATM FSNQI TUTMP TKTIP JIDTT KHIGQ ATCEG
-JMHQA FNTYM TQRTY CSNTJ IEXQA TDTXY CIRTY ACIGT PVATI HQHNY
-JFKMJ FHNTP
-```
-
-It decodes to a paraphrase of Kerckhoffs's principle: *"The security of a cipher must never depend on keeping the algorithm secret, because only the key can be changed when it is compromised."*
-
-1) **How many of the 22 distinct letters does the suggested mapping get right?**
-
-   3 out of 22 (T→E, U→V, X→Y).
-
-2) **What's the single most useful line in the whole report for a human solver?**
-
-   The repeated trigram line: `QAT: count=3, positions=[1, 45, 74]`. A trigram repeating 3 times in 110 letters, right at the start of the text, is almost certainly "THE", and that guess doesn't depend on this short sample's letters matching the language's long-run frequencies the way rank alignment does. It pins down 3 letters (Q, A, T) at once, and the top bigrams `AT` and `QA` immediately confirm it as "HE" and "TH".
-
-3) **Why does rank alignment alone not solve the cipher, and what does?**
-
-   Rank alignment assumes this one 110-letter sample's letter frequencies fall in the same order as the language's long-run average. They don't, T is the cipher's most frequent letter at 18.2%, well above English E's usual 12.6%, and several letters tie or sit close enough that sampling noise reorders them. Matching cipher-rank-i to language-rank-i is therefore often wrong, which is exactly why only 3 of 22 letters land correctly.
-
-   What actually solves it is what a human solver does: treat the frequency ranking as a rough starting point only, then confirm or correct each letter with structural evidence the ranking ignores, repeated trigrams/bigrams matched to common words ("THE", "HE", "TH"), doubled letters, and propagating each confirmed letter into the other words it appears in until the partially-decoded text starts reading as real English.
-
-# Why 26! keys is not enough (and AES-128 is)
-
-The monoalphabetic cipher has 26! ~ 4 x 10^26 keys (more than an 88-bit key), yet a human can break it in minutes with the C4 report, while AES-128 has fewer keys and nothing like that works. The difference is that key-space size only measures how expensive brute force is. The real security of a cipher is the cost of the best attack, and that depends on its structure, not on the number of keys. 
-
-A monoalphabetic cipher always maps the same plaintext letter to the same ciphertext letter, one letter at a time, so everything statistical about the plaintext survives in the ciphertext: letter frequencies, common bigrams and trigrams, doubled letters, repeated words (Structure). On top of that, the key can be found piece by piece. Each of the 26 letter mappings can be guessed and checked on its own, and a partly correct key already gives partly readable text, which tells the solver whether the last guess was right. So instead of searching 26! keys at once, the attacker solves around 26 small problems of at most 26 options each, a few hundred checks in total. 
-
-AES-128 is built so that neither of these things happens. It works on 128-bit blocks instead of single letters, and after 10 rounds of a non-linear S-box (confusion) plus ShiftRows/MixColumns (diffusion) with the key mixed in every round, every output bit depends on every plaintext bit and every key bit. The output has no letter statistics to count, and knowing part of the key (even 127 of the 128 bits) doesn't give partly readable plaintext. A wrong key gives random-looking output no matter how close it is to the right one, so there's nothing to "climb" towards. The best known attack on AES-128 (biclique cryptanalysis) still needs about 2^126 operations, basically brute force, and 2^128 is far out of reach. In short: substitution is weak because it leaks structure and lets the key be attacked in pieces, not because its key space is small.
-
-# Limitations
-
-Things that don't work, or only work partially:
-
-- **Short texts.** The breakers are statistical, so they fail on short ciphertexts. From my measurements: Caesar is not fully reliable below ~30 letters, affine below ~60, and Vigenere needs roughly 25-40 letters per coset (ciphertext length / m). Below those lengths the returned key is often wrong, and the program has no way to tell you.
-- **No confidence score.** The breakers always return the best-scoring key, even when the text is too short or in the wrong language for that key to mean anything.
-- **Wrong language table.** Using the Spanish table on English text stays at only 60-70% for Caesar (around 40% for affine) even at 100 letters, and more ciphertext doesn't fix it (see C1). The program does not detect the language by itself; the user has to pass `--lang`.
-- **Vigenere needs m.** `break_vigenere` only works when the key length is given. There's no Kasiski examination or index of coincidence yet, so a wrong `m` just returns a wrong key. With `m` larger than the text, the extra cosets are empty and get the letter `A` in the key.
-- **Empty input in the library functions.** Called directly, `break_caesar("")` returns `(0, "")`, `break_affine("")` returns `((1, 0), "")` and `break_vigenere("", m)` returns `A * m`. These look like real keys but they're just the first candidate. The CLI checks for this and gives an error instead.
-- **C4 is not a solver.** `assist.py` only does the bookkeeping. Its suggested mapping (plain rank alignment) got only 3 of 22 letters right on the given cryptogram, so a human still has to finish the job.
-- **Accents.** Accented letters are reduced to their base letter (`Ñ -> N`) instead of being removed (see Deviations), so Ñ can't be told apart from N after encryption. On Windows, text with accents piped through stdin can arrive broken because of the console encoding; `--in` with a UTF-8 file works fine.
-- **Small reference texts.** The measurement fragments come from ~1000 letters of English and ~850 of Spanish, so many fragments overlap. The percentages describe these two texts; other kinds of text (lists, names, technical text) could behave differently.
 
 # Use of LLM assistants
 
 For this project I used Claude Code for the following:
-
-- Generating tests.
-- Refining the code for encryption and decryption in order to support text with spaces, punctuation and other characters. 
-- Fixing a bug in the Vigenere coset reassembly and a mismatch between how the key index advances on encryption/decryption vs how cosets were split.
-- Creating a measure base file for all the algorithms' breakers.
-- Generating english and spanish text.
-- Fixing a bug in the monoalphabetic cipher where decrypting lowercase/mixed-case ciphertext (or using a lowercase key) silently returned it unchanged instead of decrypting it.
-- Recovering the real key for the C4 cryptogram (used only in `measure_assist.py`, to grade the suggested mapping) with a quadgram-based hill-climbing/simulated-annealing search against public-domain English text, to know the ground truth for the report-task questions.
-- Redacting answers and this file.
-- Writing the Part D tests (`tests/test_crypto.py`) and the "How to run it" section of this file.
-- Reviewing the whole project against the handout: renaming functions to the handout names, stricter key validation (non A-Z letters in keys, empty XOR key, unknown language), and rewriting the tests so every part has check values, round-trips, invalid keys, edge cases and 20 generated ciphertexts per breaker. Measurements were re-run afterwards. 

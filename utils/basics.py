@@ -2,7 +2,6 @@ import unicodedata
 
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-
 def normalise(text: str) -> str:
     # uppercase, accents folded (É -> E, Ñ -> N), everything outside A-Z removed
     text = unicodedata.normalize("NFD", text.upper())

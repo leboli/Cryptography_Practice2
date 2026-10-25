@@ -1,9 +1,13 @@
 
+from utils.basics import normalise
+
+
 def encrypt(plaintext: str, rails: int) -> str:
+    if rails < 1:
+        raise ValueError(f"Number of rails must be at least 1, got {rails}")
+    plaintext = normalise(plaintext)
     if rails == 1 or rails >= len(plaintext):
         return plaintext
-    elif rails < 1:
-        raise ValueError(f"Number of rails must be at least 1, got {rails}")
 
     period = 2 * rails - 2
     lines = [''] * rails
@@ -18,10 +22,11 @@ def encrypt(plaintext: str, rails: int) -> str:
 
 
 def decrypt(ciphertext: str, rails: int) -> str:
+    if rails < 1:
+        raise ValueError(f"Number of rails must be at least 1, got {rails}")
+    ciphertext = normalise(ciphertext)
     if rails == 1 or rails >= len(ciphertext):
         return ciphertext
-    elif rails < 1:
-        raise ValueError(f"Number of rails must be at least 1, got {rails}")
 
     period = 2 * rails - 2
     # Calculate the number of characters in each rail
